@@ -9,16 +9,49 @@ const pokemonTypes = [
 
 function App() {
   const [selectedType, setSelectedType] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
 
-function getMatchup(type) {
-  // API CALL WILL GO HERE, AND WE WILL RETURN THE RESPONSE
-  return `Fake API response: You are fighting a ${type}-type Pokémon.`;
-}
+  async function getMatchup(type) {
+    try {
+      const response = await fetch(
+        `http://localhost:5001/api/type/${encodeURIComponent(type.toLowerCase())}`,
+      )
+      const data = await response.json()
 
-function handleTypeClick(type) {
-  const response = getMatchup(type);
-  setSelectedType(response);
-}
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to load matchup.')
+      }
+
+      return data
+    } catch (error) {
+      return { error: error.message || 'Unable to connect to the server.' }
+    }
+  }
+
+  async function handleTypeClick(type) {
+    setIsLoading(true)
+    setSelectedType('Loading…')
+    const response = await getMatchup(type)
+    if (response.error) {
+      setSelectedType(response.error)
+    } else {
+      const formatTypes = (types) => types
+        .map(name => name.charAt(0).toUpperCase() + name.slice(1))
+        .join(', ')
+
+      const attackAdvice = response.double_damage_from.length
+        ? `Attack with ${formatTypes(response.double_damage_from)}-type moves to deal 2× damage.`
+        : 'No move types deal 2× damage against this type.'
+      const defenseAdvice = response.half_damage_to.length
+        ? `${formatTypes(response.half_damage_to)}-type Pokémon take ½ damage from ${type}-type moves.`
+        : `No Pokémon types take ½ damage from ${type}-type moves.`
+
+      setSelectedType(
+        `Facing a ${type}-type Pokémon\n\n${attackAdvice}\n\n${defenseAdvice}\n\nThese matchups consider one type only. A second type or an ability can change the damage.`,
+      )
+    }
+    setIsLoading(false)
+  }
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-stone-100 px-5 py-12 font-sans text-slate-900">
@@ -34,12 +67,12 @@ function handleTypeClick(type) {
           <p id="type-prompt" className="mt-4 text-base text-slate-600">What type of Pokémon are you fighting?</p>
           <div role="group" aria-labelledby="type-prompt" className="mt-6 grid grid-cols-2 gap-3">
             {pokemonTypes.map(({ name, style }) => (
-              <button key={name} type="button" onClick={() => handleTypeClick(type.name)} className={`cursor-pointer rounded-xl border px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-900 ${style}`}>
+              <button key={name} type="button" disabled={isLoading} onClick={() => handleTypeClick(name)} className={`cursor-pointer rounded-xl border px-4 py-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-slate-900 disabled:cursor-wait disabled:opacity-60 ${style}`}>
                 {name}
               </button>
             ))}
           </div>
-          <p aria-live="polite" className="mt-4 text-slate-600">{selectedType}</p>
+          <p aria-live="polite" className="mt-4 whitespace-pre-line break-words text-slate-600">{selectedType}</p>
         </div>
       </section>
     </main>
